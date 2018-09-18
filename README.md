@@ -25,7 +25,7 @@ Using `head` I inspected the first 10 lines of each file, neither of which began
     Sample_ID       JG_OTU  Group   abph1.20        abph1.22        ae1.3   [...]
     SNP_ID  cdv_marker_id   Chromosome      Position        alt_pos [...]
 
-The data in each file appeared to be tab-delimited with the first rows consisting of column headings, so I used `Awk` to count the number of columns in the first row (and verified the same count for another row mid-file). I also used `cut` to try and find any rows that might contain data beyond that number of columns:
+The data in each file appeared to be tab-delimited with the first rows consisting of column headings, so I used `Awk` to count the number of columns in the first row (and verified the same count for another row mid-file). I also used `cut` to check for any rows which might contain entries beyond the stated number of columns:
 
     $ awk -F "\t" '{print NF; exit}' fang_et_al_genotypes.txt
     986
@@ -33,8 +33,9 @@ The data in each file appeared to be tab-delimited with the first rows consistin
     $ awk -F "\t" 'NR==1783 {print NF; exit}' fang_et_al_genotypes.txt
     986
 
-    $ cut -f 987-997 fang_et_al_genotypes.txt | sort | (head -n 1; tail -n 1)
-    # Output lines blank.
+    $ cut -f 987-997 fang_et_al_genotypes.txt | grep "." | wc -l
+    0
+
 
 
     $ awk -F "\t" '{print NF; exit}' snp_position.txt
@@ -43,8 +44,30 @@ The data in each file appeared to be tab-delimited with the first rows consistin
     $ awk -F "\t" 'NR==783 {print NF; exit}' snp_position.txt
     15
 
-    $ cut -f 16-30 snp_position.txt | sort | (head -n 1; tail -n 1)
-    # Output lines blank.
+    $ cut -f 16-30 snp_position.txt | grep "." | wc -l
+    0
+
+Thus, `fang_et_al_genotypes.txt` appears to be a (2,783 x 986)-entry table and `snp_position.txt` a (984 x 15)-entry table (including column headers as first row).
+
+Given the close correlation between the number of columns in `fang_et_al_genotypes.txt` and the number of rows in `snp_position.txt`, I examined the first and last 5 columns in `fang_et_al_genotypes.txt` and the first and last 5 rows in `snp_position.txt`:
+
+    $ head -n 1 fang_et_al_genotypes.txt | cut -f 1-5,982-986 | column -t
+    Sample_ID  JG_OTU  Group  abph1.20  abph1.22  zen1.1  zen1.2  zen1.4  zfl2.6  zmm3.4
+
+    $ cat snp_position.txt | (head -n 5; tail -n 5) | column -t
+    SNP_ID    cdv_marker_id  Chromosome  Position   alt_pos  mult_positions  [...]
+    abph1.20  5976           2           27403404   abph1    AB042260          .
+    abph1.22  5978           2           27403892   abph1    AB042260        
+    ae1.3     6605           5           167889790  ae1      ae1               .
+    ae1.4     6606           5           167889682  ae1      ae1             
+    zen1.1    3519           unknown     unknown    zen1     CF649098          .
+    zen1.2    3520           unknown     unknown    zen1     CF649098        
+    zen1.4    3521           unknown     unknown    zen1     CF649098          .
+    zfl2.6    6463           2           12543294   zfl2     zfl2            
+    zmm3.4    3527           9           16966348   zmm3     Y09301          [...]
+
+Thus it appears the 983 (non-header) rows in `snp_position.txt` correspond to the final 983 columns in `fang_et_al_genotypes.txt`.
+
 
 
 
