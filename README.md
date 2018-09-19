@@ -77,7 +77,7 @@ Thus it appears the 983 (non-header) rows in `snp_position.txt` correspond to th
 
 ##2. Data Processing
 
-Since we eventually want to have missing data in the formatted files encoded by particular symbols, I started by inserting place-holder symbols into any empty fields:
+Since we eventually want any missing data in the formatted files to be encoded using particular symbols, I started by using "@" as a proxy delimiter to insert the place-holder symbol "#" into all empty fields (which first required verifying that neither symbol appeared anywhere else in either file):
 
     $ grep -v "[@#]" fang_et_al_genotypes.txt | wc -l
     2783
@@ -87,9 +87,10 @@ Since we eventually want to have missing data in the formatted files encoded by 
 
     $ sed 's/\t/@:/g' snp_position.txt | sed 's/:@/:#@/g' | sed 's/@:/\t/g'
 
-    $ sed 's/\t/@:/g' snp_position.txt | sed 's/:@/:#@/g' | sed 's/@:/\t/g' | cut -f 16-30 snp_position.txt | grep "." | wc -l
+    $ sed 's/\t/@:/g' snp_position.txt | sed 's/:@/:#@/g' | sed 's/@:/\t/g' | cut -f 16-30 | grep "." | wc -l
     0
 
+The last command verifies that no row in the output contains more than 15 columns (indicating that no exexcess fields were added to any row 
 
 For all files generated during the data processing steps, the first three columns will be "SNP_ID", "Chromosome", and "Position", which are respectively the first, third, and fourth columns of `snp_position.txt`. The output files will be organized based on the location of SNPs, which in addition to the "Chromosome" and "Position" columns may also 
 
@@ -110,9 +111,49 @@ For all files generated during the data processing steps, the first three column
           6 multiple
          27 unknown
 
-    $ tail -n +2 snp_position.txt | cut -f 3 | sort -V | wc -l
+    $ tail -n +2 snp_position.txt | cut -f 3 | wc -l
     983
 
+    $ tail -n +2 snp_position.txt | cut -f 6 | sort -V | uniq -c
+        966
+          1 Chr1(9691660);Chr2(225530627);
+          1 Chr1(275076660);Chr8(71078729);
+          1 Chr2(17581865);Chr3(143082611);Chr6(158386495);
+          1 Chr2(209957515;210039173);
+          1 Chr4(106637739;106644768;157652727);Chr8(111504317);
+          1 Chr4(226884645);Chr5(115246667);
+          1 Chr4(241144995;241178306);
+          1 Chr4(241145101;241178412);
+          1 Chr4(241145151;241178462);
+          1 Chr5(150771372);Chr10(139167376);
+          1 Chr6(25035259;25122956);
+          1 Chr6(25035262;25122959);
+          1 Chr6(25035303;25123000);
+          1 Chr7(108218425;108952795);
+          1 Chr9(43692524;43720849);
+          1 Chr9(43692603;43720928);
+          1 Chr9(43692633;43720958);
+
+    $ tail -n +2 snp_position.txt | cut -f 4 | sort -V | grep -v "[0-9]" | uniq -c | (head -n 5; tail -n 5)
+          6
+         11 multiple
+         27 unknown
+
+$ tail -n +2 snp_position.txt | cut -f 4 | sort -V | grep "[^0-9]" | uniq -c | (head -n 5; tail -n 5)
+     11 multiple
+     27 unknown
+
+$ tail -n +2 snp_position.txt | cut -f 4 | sort -V | grep -v "[0-9]+" | uniq -c | (head -n 5; tail -n 5)
+      6
+      1 139753
+      1 139810
+      1 157104
+      1 920922
+      1 298082534
+      1 298082627
+      1 298412984
+     11 multiple
+     27 unknown
 
 
     $ cut -f 3 fang_et_al_genotypes.txt | grep -E "(ZMMIL|ZMMLR|ZMMMR)" | sort | uniq -c
