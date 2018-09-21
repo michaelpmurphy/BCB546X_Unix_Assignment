@@ -1,4 +1,5 @@
 # BCB546X\_Unix\_Assignment
+(Completed files are located in the directory `BCB546X_Unix_Assignment/Finished_SNP_Files/`.)
 
 ##1. Data Inspection
 
@@ -46,7 +47,7 @@ The data in each file appeared to be tab-delimited with the first rows consistin
     $ cut -f 16-30 snp_position.txt | grep "." | wc -l
     0
 
-In short, `fang_et_al_genotypes.txt` appears to be a (2,783 x 986)-entry table and `snp_position.txt` a (984 x 15)-entry table (including column headers as first row).
+In short, `fang_et_al_genotypes.txt` appears to be a (2,783 x 986)-entry table and `snp_position.txt` a (984 x 15)-entry table (including column headers as the first row).
 
 Given the close correlation between the number of columns in `fang_et_al_genotypes.txt` and the number of rows in `snp_position.txt`, I examined the first and last 5 columns in `fang_et_al_genotypes.txt` and the first and last 5 rows in `snp_position.txt`:
 
@@ -71,15 +72,11 @@ Given the close correlation between the number of columns in `fang_et_al_genotyp
 
 Thus it appears the 983 (non-header) rows in `snp_position.txt` correspond to the final 983 columns in `fang_et_al_genotypes.txt`. This inspection also reveals that each file contains fields with missing or incomplete information.
 
-
-&& || and $?
-
-
 ##2. Data Processing
 
-For all files generated during the data processing steps, the first three columns will be "SNP_ID", "Chromosome", and "Position", which are respectively the first, third, and fourth columns of `snp_position.txt`. The output files will be organized based on the location of SNPs, which in addition to the "Chromosome" and "Position" columns may also be indicated by entries in the "mult_positions" (sixth) column).
+For all files generated during the data processing steps, the first three columns will be "SNP\_ID", "Chromosome", and "Position", which are respectively the first, third, and fourth columns of `snp_position.txt`. The output files will be organized based on the location of SNPs, which in addition to the "Chromosome" and "Position" columns may also be indicated by entries in the "mult\_positions" (sixth) column.
 
-Since some rows in `snp_position.txt` contain empty fields (which can wreak havoc on `awk` when trying to use field delimiters $k), I started by using "@" as a proxy delimiter to insert the place-holder symbol "#" into all empty fields (which first required verifying that neither symbol appeared anywhere else in either file -- though in general any  non-functional symbol could be used instead):
+Since some rows in `snp_position.txt` contain empty fields (which can wreak havoc on `awk` when trying to use field delimiters $k), I started by using "@" as a proxy delimiter to insert the place-holder symbol "#" into all empty fields (which first required verifying that neither symbol appeared anywhere else in either file -- but in general any  non-functional symbol could be used here instead):
 
     $ grep -v "[@#]" fang_et_al_genotypes.txt | wc -l
     2783
@@ -94,7 +91,7 @@ Since some rows in `snp_position.txt` contain empty fields (which can wreak havo
 
 The last command checks that no row in the output contains more than 15 columns (verifying that no _**excess**_ fields were erroneously added in any row either).
 
-Since SNPs with unknown or multiple locations are to be separated into specific files, I examined Columns 3 and 4 to determine the number of each present:
+Since SNPs with unknown or multiple locations are to be separated into specific files, I examined Columns 3 and 4 to determine the number of each kind present:
 
     $ tail -n +2 snp_position_noblanks.txt | cut -f 3 | sort -V | uniq -c
         155 1
@@ -122,7 +119,7 @@ Since SNPs with unknown or multiple locations are to be separated into specific 
          27 unknown
           6 #
 
-It appears that there are 27 SNPs with unknown positions, but it is unclear from this how many SNPs there are with multiple positions. Examining Column 6 however reveals the answer:
+It appears that there are 27 SNPs with unknown positions, but it is unclear from this how many SNPs there are with multiple positions. Examining Column 6, however, reveals the answer:
 
     $ tail -n +2 snp_position_noblanks.txt | cut -f 6 | sort -V | uniq -c
           1 Chr1(9691660);Chr2(225530627);
@@ -167,7 +164,7 @@ It appears that there are 27 SNPs with unknown positions, but it is unclear from
 
 It turns out there are a total of 17 SNPs that have multiple positions in the genome -- 6 that are located on multiple chromosomes, and 11 located at multiple positions on the same chromosome.
 
-(NOTE: For this exercise, the actual data processing steps did not require place-holder characters in the blank fields to make the commands function properly. However, since such issues could easily arise in general applications -- and since the characters are easy to remove from files as a final step -- the data processing below was still performed on the files containing these characters.)
+(NOTE: For this exercise, the actual data processing steps did not require place-holder characters in the blank fields to make the commands function properly. However, since such issues could easily arise in general applications -- and since the characters are easy to remove from files as a final step -- the data processing below was still performed with the files containing these characters.)
 
 
 ###Joining the Files
@@ -193,7 +190,7 @@ First I extracted the three desired columns from `snp_position.txt` and sorted t
     3
     984 snp_position_sorted_noblanks.txt
 
-Since this project only concerns the maize and teosinte individuals in `fang_et_al_genotypes.txt`, I extracted these groups into separate files as well. To enable Join, these files were transposed to put the SNP names in Column 1 (the Join column), the Column 1 header was changed to match SNP_ID, Rows 2 and 3 (of unnecessary information) were removed, and the SNPs were then sorted alphanumerically:
+Since this project only concerns the maize and teosinte individuals in `fang_et_al_genotypes.txt`, I extracted these groups into separate files as well. To enable Join, these files were transposed to put the SNP names in Column 1 (the Join column), the Column 1 header was changed to match SNP_ID, Rows 2 and 3 (of unnecessary information) were removed, and the SNPs were sorted alphanumerically:
 
     $ cut -f 3 fang_et_al_genotypes.txt | grep -E "(ZMMIL|ZMMLR|ZMMMR)" | sort | uniq -c
         290 ZMMIL
@@ -283,13 +280,15 @@ Next each file was joined with `snp_position_sorted_noblanks.txt` and checked fo
 
 
 
-Finally, for each group the SNPs with unknown or multiple positions were split into separate files, and the remaining SNPs were reorganized to match their appropriate final formats before being divided by chromosome number:
+Finally, for each group the SNPs with unknown or multiple positions were split into separate files, and the remaining SNPs were reorganized to match their appropriate final formats before being partitioned by chromosome number:
 
     $ (head -n 1 maize_master_snps.txt; tail -n +2 maize_master_snps.txt | awk '$2 ~ /unknown/ {print $0}') > C_unknown_maize.txt
 
-    $ (head -n 1 maize_master_snps.txt; tail -n +2 maize_master_snps.txt | awk '$2 ~ /multiple/ || $3 ~ /multiple/ {print $0}') | sed 's/#//g' > C_multiple_maize.txt
+    $ (head -n 1 maize_master_snps.txt; tail -n +2 maize_master_snps.txt | awk '$2 ~ /multiple/ || $3 ~ /multiple/ {print $0}') | \
+    sed 's/#//g' > C_multiple_maize.txt
 
-    $ (head -n 1 maize_master_snps.txt; tail -n +2 maize_master_snps.txt | awk '$2 !~ /unknown|multiple/ && $3 !~ /multiple/ {print $0}') > maize_known_snps.txt
+    $ (head -n 1 maize_master_snps.txt; tail -n +2 maize_master_snps.txt | awk '$2 !~ /unknown|multiple/ && $3 !~ /multiple/ \
+    {print $0}') > maize_known_snps.txt
 
     $ wc -l C_unknown_maize.txt C_multiple_maize.txt maize_known_snps.txt
          28 C_unknown_maize.txt
@@ -301,17 +300,21 @@ Finally, for each group the SNPs with unknown or multiple positions were split i
 
     $ sort -k2,2n -k3,3nr maize_ascending_snps.txt | sed 's/?/-/g' > maize_descending_snps.txt
 
-    $ awk 'NR==1{h=$0; next};!seen [$2]++{f="C"$2"_maize_ascending.txt"; print h > f};{f="C"$2"_maize_ascending.txt"; print >> f; close (f)}' maize_ascending_snps.txt
+    $ awk 'NR==1{h=$0; next};!seen [$2]++{f="C"$2"_maize_ascending.txt"; print h > f};{f="C"$2"_maize_ascending.txt"; print >> f; \
+    close (f)}' maize_ascending_snps.txt
 
-    $ awk 'NR==1{h=$0; next};!seen [$2]++{f="C"$2"_maize_descending.txt"; print h > f};{f="C"$2"_maize_descending.txt"; print >> f; close (f)}' maize_descending_snps.txt
+    $ awk 'NR==1{h=$0; next};!seen [$2]++{f="C"$2"_maize_descending.txt"; print h > f};{f="C"$2"_maize_descending.txt"; print >> f; \
+    close (f)}' maize_descending_snps.txt
 
 ---
 
     $ (head -n 1 teosinte_master_snps.txt; tail -n +2 teosinte_master_snps.txt | awk '$2 ~ /unknown/ {print $0}') > C_unknown_teosinte.txt
 
-    $ (head -n 1 teosinte_master_snps.txt; tail -n +2 teosinte_master_snps.txt | awk '$2 ~ /multiple/ || $3 ~ /multiple/ {print $0}') | sed 's/#//g' > C_multiple_teosinte.txt
+    $ (head -n 1 teosinte_master_snps.txt; tail -n +2 teosinte_master_snps.txt | awk '$2 ~ /multiple/ || $3 ~ /multiple/ {print $0}') | \
+    sed 's/#//g' > C_multiple_teosinte.txt
 
-    $ (head -n 1 teosinte_master_snps.txt; tail -n +2 teosinte_master_snps.txt | awk '$2 !~ /unknown|multiple/ && $3 !~ /multiple/ {print $0}') > teosinte_known_snps.txt
+    $ (head -n 1 teosinte_master_snps.txt; tail -n +2 teosinte_master_snps.txt | awk '$2 !~ /unknown|multiple/ && $3 !~ /multiple/ \
+    {print $0}') > teosinte_known_snps.txt
 
     $ wc -l C_unknown_teosinte.txt C_multiple_teosinte.txt teosinte_known_snps.txt
          28 C_unknown_teosinte.txt
@@ -323,9 +326,11 @@ Finally, for each group the SNPs with unknown or multiple positions were split i
 
     $ sort -k2,2n -k3,3nr teosinte_ascending_snps.txt | sed 's/?/-/g' > teosinte_descending_snps.txt
 
-    $ awk 'NR==1{h=$0; next};!seen [$2]++{f="C"$2"_teosinte_ascending.txt"; print h > f};{f="C"$2"_teosinte_ascending.txt"; print >> f; close (f)}' teosinte_ascending_snps.txt
+    $ awk 'NR==1{h=$0; next};!seen [$2]++{f="C"$2"_teosinte_ascending.txt"; print h > f};{f="C"$2"_teosinte_ascending.txt"; print >> f; \
+    close (f)}' teosinte_ascending_snps.txt
 
-    $ awk 'NR==1{h=$0; next};!seen [$2]++{f="C"$2"_teosinte_descending.txt"; print h > f};{f="C"$2"_teosinte_descending.txt"; print >> f; close (f)}' teosinte_descending_snps.txt
+    $ awk 'NR==1{h=$0; next};!seen [$2]++{f="C"$2"_teosinte_descending.txt"; print h > f};{f="C"$2"_teosinte_descending.txt"; \
+    print >> f; close (f)}' teosinte_descending_snps.txt
 
 ##Afterward:
-Since this exercise only involved two groups (maize and teosinte), the practical approach was simply to run duplicate commands for each group. For a larger number of groups though, the preceding method could be readily streamlined to allow for greater indexing over the range of desired groups.
+Since this exercise only involved two groups (maize and teosinte), the practical approach was simply to run duplicate commands for each group. For a larger number of groups though, the preceding method could be readily streamlined to allow for more-efficient indexing over ranges of desired groups.
