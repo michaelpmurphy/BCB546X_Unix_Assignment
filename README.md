@@ -35,7 +35,7 @@ The data in each file appeared to be tab-delimited with the first rows consistin
     $ cut -f 987-997 fang_et_al_genotypes.txt | grep "." | wc -l
     0
 
-
+---
 
     $ awk -F "\t" '{print NF; exit}' snp_position.txt
     15
@@ -77,7 +77,9 @@ Thus it appears the 983 (non-header) rows in `snp_position.txt` correspond to th
 
 ##2. Data Processing
 
-Since we eventually want any missing data in the formatted files to be encoded using particular symbols, I started by using "@" as a proxy delimiter to insert the place-holder symbol "#" into all empty fields (which first required verifying that neither symbol appeared anywhere else in either file):
+For all files generated during the data processing steps, the first three columns will be "SNP_ID", "Chromosome", and "Position", which are respectively the first, third, and fourth columns of `snp_position.txt`. The output files will be organized based on the location of SNPs, which in addition to the "Chromosome" and "Position" columns may also be indicated by entries in the "mult_positions" (sixth) column).
+
+Since some rows in `snp_position.txt` contain empty fields (which can wreak havoc on `awk` when trying to use field delimiters $k), I started by using "@" as a proxy delimiter to insert the place-holder symbol "#" into all empty fields (which first required verifying that neither symbol appeared anywhere else in either file -- though in general any  non-functional symbol could be used instead):
 
     $ grep -v "[@#]" fang_et_al_genotypes.txt | wc -l
     2783
@@ -90,11 +92,9 @@ Since we eventually want any missing data in the formatted files to be encoded u
     $ cut -f 16-30 snp_position_noblanks.txt | grep "." | wc -l
     0
 
-The last command verifies that no row in the output contains more than 15 columns (indicating that no exexcess fields were added to any row 
+The last command checks that no row in the output contains more than 15 columns (verifying that no _**excess**_ fields were erroneously added in any row either).
 
-For all files generated during the data processing steps, the first three columns will be "SNP_ID", "Chromosome", and "Position", which are respectively the first, third, and fourth columns of `snp_position.txt`. The output files will be organized based on the location of SNPs, which in addition to the "Chromosome" and "Position" columns may also 
-
-awk -f transpose.awk fang_et_al_genotypes.txt | tail -n +4 | sort -V -k1,1 | sort -V -k1,1 -c
+Since SNPs with unknown or multiple locations are to be separated into specific files, I examined Columns 3 and 4 to determine the number of each present:
 
     $ tail -n +2 snp_position_noblanks.txt | cut -f 3 | sort -V | uniq -c
         155 1
@@ -110,9 +110,6 @@ awk -f transpose.awk fang_et_al_genotypes.txt | tail -n +4 | sort -V -k1,1 | sor
           6 multiple
          27 unknown
 
-    $ tail -n +2 snp_position_noblanks.txt | cut -f 3 | wc -l
-    983
-
     $ tail -n +2 snp_position_noblanks.txt | cut -f 4 | sort -V | uniq -c | (head -n 5; tail -n 5)
           1 139753
           1 139810
@@ -125,10 +122,7 @@ awk -f transpose.awk fang_et_al_genotypes.txt | tail -n +4 | sort -V -k1,1 | sor
          27 unknown
           6 #
 
-    $ tail -n +2 snp_position_noblanks.txt | cut -f 4 | sort -V | grep "[^0-9]" | uniq -c
-         11 multiple
-         27 unknown
-          6 #
+It appears that there are 27 SNPs with unknown positions, but it is unclear from this how many SNPs there are with multiple positions. Examining Column 6 however reveals the answer:
 
     $ tail -n +2 snp_position_noblanks.txt | cut -f 6 | sort -V | uniq -c
           1 Chr1(9691660);Chr2(225530627);
@@ -171,85 +165,14 @@ awk -f transpose.awk fang_et_al_genotypes.txt | tail -n +4 | sort -V -k1,1 | sor
     569   PZA02948.22  11655          6           multiple  #        Chr6(25035259;25122956);
     808   PZB00188.6   6198           multiple    #         #        Chr4(106637739;106644768;157652727);Chr8(111504317);
 
-Examining the entries in Column 6 shows there are in fact a total of 17 SNPs with multiple positions in the genome -- 6 located on multiple chromosomes and 11 located at multiple positions on the same chromosome. However there is no need to retain Column 6 since all its information is contained jointly in Columns 3 and 4.
+It turns out there are a total of 17 SNPs that have multiple positions in the genome -- 6 that are located on multiple chromosomes, and 11 located at multiple positions on the same chromosome.
+
+(NOTE: For this exercise, the actual data processing steps did not require place-holder characters in the blank fields to make the commands function properly. However, since such issues could easily arise in general applications -- and since the characters are easy to remove from files as a final step -- the data processing below was still performed on the files containing these characters.)
 
 
+###Joining the Files
 
-
-
-    $ cut -f 3 fang_et_al_genotypes.txt | grep -E "(ZMMIL|ZMMLR|ZMMMR)" | sort | uniq -c
-        290 ZMMIL
-       1256 ZMMLR
-         27 ZMMMR
-
-    $ (head -n 1 fang_et_al_genotypes.txt; awk '$3 ~ /(ZMMIL|ZMMLR|ZMMMR)/ {print $0}' fang_et_al_genotypes.txt | \
-    sort -k1,1V) > fang_et_al_genotypes_maize.txt
-
-    $ awk -f transpose.awk fang_et_al_genotypes_maize.txt > transposed_maize_genotypes.txt 
-
-Sort, remove Rows 2 and 3, and change Column 1 header to enable Join:
-
-    $ (head -n 1 transposed_maize_genotypes.txt | sed 's/Sample_ID/SNP_ID/'; tail -n +4 transposed_maize_genotypes.txt | \
-    sort -Vf -k1,1) > maize_genotypes_transposed_sorted.txt
-
-    $ cat maize_genotypes_transposed_sorted.txt | (head -n 5; tail -n 5) | cut -f 1-6 | column -t
-    SNP_ID    BKN_001  BKN_002  BKN_003  BKN_004  BKN_009
-    abph1.20  C/C      C/C      C/C      C/C      C/C
-    abph1.22  A/A      A/A      A/A      A/A      A/A
-    ae1.3     T/T      T/T      T/T      T/T      T/T
-    ae1.4     G/G      G/G      G/G      G/G      G/G
-    zen1.1    C/C      C/C      G/G      G/G      C/C
-    zen1.2    ?/?      A/G      A/A      A/A      G/G
-    zen1.4    C/T      C/T      C/C      C/C      C/C
-    zfl2.6    G/G      G/G      G/G      G/G      G/G
-    zmm3.4    C/C      C/C      C/C      T/T      C/C
-
-    $ (awk '{print NF; exit}' maize_genotypes_transposed_sorted.txt; wc -l maize_genotypes_transposed_sorted.txt )
-    1574
-    984 maize_genotypes_transposed_sorted.txt
-
-
-
-
-
-
-
-    $ cut  -f 3 fang_et_al_genotypes.txt | grep -E "(ZMPBA|ZMPIL|ZMPJA)" | sort | uniq -c
-        900 ZMPBA
-         41 ZMPIL
-         34 ZMPJA
-
-    $ (head -n 1 fang_et_al_genotypes.txt; awk '$3 ~ /(ZMPBA|ZMPIL|ZMPJA)/ {print $0}' fang_et_al_genotypes.txt | \
-    sort -k1,1V) > fang_et_al_genotypes_teosinte.txt
-
-    $ awk -f transpose.awk fang_et_al_genotypes_teosinte.txt > transposed_teosinte_genotypes.txt 
-
-Sort, remove Rows 2 and 3, and change Column 1 header to enable Join:
-
-    $ (head -n 1 transposed_teosinte_genotypes.txt | sed 's/Sample_ID/SNP_ID/'; tail -n +4 transposed_teosinte_genotypes.txt | \
-    sort -Vf -k1,1) > teosinte_genotypes_transposed_sorted.txt
-
-    $ cat teosinte_genotypes_transposed_sorted.txt | (head -n 5; tail -n 5) | cut -f 1-6 | column -t
-    SNP_ID    S0728  S0768  S0881  S0887  S1057
-    abph1.20  G/G    G/G    C/G    C/G    C/G
-    abph1.22  A/A    A/A    A/A    A/A    A/A
-    ae1.3     T/T    T/T    T/T    T/T    G/T
-    ae1.4     G/G    A/G    G/G    G/G    A/G
-    zen1.1    C/C    G/G    G/G    G/G    G/G
-    zen1.2    G/G    A/G    G/G    ?/?    A/G
-    zen1.4    C/C    C/C    T/T    C/T    C/C
-    zfl2.6    G/G    G/G    G/G    G/G    ?/?
-    zmm3.4    C/C    C/C    C/C    C/C    ?/?
-
-    $ (awk '{print NF; exit}' teosinte_genotypes_transposed_sorted.txt; wc -l teosinte_genotypes_transposed_sorted.txt )
-    976
-    984 teosinte_genotypes_transposed_sorted.txt
-
-
-
-
-
-
+First I extracted the three desired columns from `snp_position.txt` and sorted this list of SNPs alphanumerically:
 
     $ (head -n 1 snp_position_noblanks.txt; tail -n +2 snp_position_noblanks.txt | sort -Vf -k1,1) | \
     cut -f 1,3,4 > snp_position_sorted_noblanks.txt
@@ -270,21 +193,69 @@ Sort, remove Rows 2 and 3, and change Column 1 header to enable Join:
     3
     984 snp_position_sorted_noblanks.txt
 
+Since this project only concerns the maize and teosinte individuals in `fang_et_al_genotypes.txt`, I extracted these groups into separate files as well. To enable Join, these files were transposed to put the SNP names in Column 1 (the Join column), the Column 1 header was changed to match SNP_ID, Rows 2 and 3 (of unnecessary information) were removed, and the SNPs were then sorted alphanumerically:
 
+    $ cut -f 3 fang_et_al_genotypes.txt | grep -E "(ZMMIL|ZMMLR|ZMMMR)" | sort | uniq -c
+        290 ZMMIL
+       1256 ZMMLR
+         27 ZMMMR
 
+    $ (head -n 1 fang_et_al_genotypes.txt; awk '$3 ~ /(ZMMIL|ZMMLR|ZMMMR)/ {print $0}' fang_et_al_genotypes.txt | \
+    sort -k1,1V) > fang_et_al_genotypes_maize.txt
 
+    $ awk -f transpose.awk fang_et_al_genotypes_maize.txt > transposed_maize_genotypes.txt 
 
+    $ (head -n 1 transposed_maize_genotypes.txt | sed 's/Sample_ID/SNP_ID/'; tail -n +4 transposed_maize_genotypes.txt | \
+    sort -Vf -k1,1) > maize_genotypes_transposed_sorted.txt
 
+    $ cat maize_genotypes_transposed_sorted.txt | (head -n 5; tail -n 5) | cut -f 1-6 | column -t
+    SNP_ID    BKN_001  BKN_002  BKN_003  BKN_004  BKN_009
+    abph1.20  C/C      C/C      C/C      C/C      C/C
+    abph1.22  A/A      A/A      A/A      A/A      A/A
+    ae1.3     T/T      T/T      T/T      T/T      T/T
+    ae1.4     G/G      G/G      G/G      G/G      G/G
+    zen1.1    C/C      C/C      G/G      G/G      C/C
+    zen1.2    ?/?      A/G      A/A      A/A      G/G
+    zen1.4    C/T      C/T      C/C      C/C      C/C
+    zfl2.6    G/G      G/G      G/G      G/G      G/G
+    zmm3.4    C/C      C/C      C/C      T/T      C/C
 
-    $ (tail -n +2 snp_position_sorted_noblanks.txt | sort -Vf -k1,1 -c && echo "SUCCESS" ; \
-    tail -n +4 maize_genotypes_transposed_sorted.txt | sort -Vf -k1,1 -c && echo "SUCCESS" ; \
-    tail -n +4 teosinte_genotypes_transposed_sorted.txt | sort -Vf -k1,1 -c && echo "SUCCESS")
-    SUCCESS
-    SUCCESS
-    SUCCESS
+    $ (awk '{print NF; exit}' maize_genotypes_transposed_sorted.txt; wc -l maize_genotypes_transposed_sorted.txt )
+    1574
+    984 maize_genotypes_transposed_sorted.txt
 
+---
 
+    $ cut  -f 3 fang_et_al_genotypes.txt | grep -E "(ZMPBA|ZMPIL|ZMPJA)" | sort | uniq -c
+        900 ZMPBA
+         41 ZMPIL
+         34 ZMPJA
 
+    $ (head -n 1 fang_et_al_genotypes.txt; awk '$3 ~ /(ZMPBA|ZMPIL|ZMPJA)/ {print $0}' fang_et_al_genotypes.txt | \
+    sort -k1,1V) > fang_et_al_genotypes_teosinte.txt
+
+    $ awk -f transpose.awk fang_et_al_genotypes_teosinte.txt > transposed_teosinte_genotypes.txt 
+
+    $ (head -n 1 transposed_teosinte_genotypes.txt | sed 's/Sample_ID/SNP_ID/'; tail -n +4 transposed_teosinte_genotypes.txt | \
+    sort -Vf -k1,1) > teosinte_genotypes_transposed_sorted.txt
+
+    $ cat teosinte_genotypes_transposed_sorted.txt | (head -n 5; tail -n 5) | cut -f 1-6 | column -t
+    SNP_ID    S0728  S0768  S0881  S0887  S1057
+    abph1.20  G/G    G/G    C/G    C/G    C/G
+    abph1.22  A/A    A/A    A/A    A/A    A/A
+    ae1.3     T/T    T/T    T/T    T/T    G/T
+    ae1.4     G/G    A/G    G/G    G/G    A/G
+    zen1.1    C/C    G/G    G/G    G/G    G/G
+    zen1.2    G/G    A/G    G/G    ?/?    A/G
+    zen1.4    C/C    C/C    T/T    C/T    C/C
+    zfl2.6    G/G    G/G    G/G    G/G    ?/?
+    zmm3.4    C/C    C/C    C/C    C/C    ?/?
+
+    $ (awk '{print NF; exit}' teosinte_genotypes_transposed_sorted.txt; wc -l teosinte_genotypes_transposed_sorted.txt )
+    976
+    984 teosinte_genotypes_transposed_sorted.txt
+
+Next each file was joined with `snp_position_sorted_noblanks.txt` and checked for completeness: 
 
     $ join -1 1 -2 1 -t $'\t' snp_position_sorted_noblanks.txt maize_genotypes_transposed_sorted.txt > maize_master_snps.txt
 
@@ -297,8 +268,7 @@ Sort, remove Rows 2 and 3, and change Column 1 header to enable Join:
     $ awk '{print NF; exit}' maize_master_snps.txt
     1576
 
-
-
+---
 
     $ join -1 1 -2 1 -t $'\t' snp_position_sorted_noblanks.txt teosinte_genotypes_transposed_sorted.txt > teosinte_master_snps.txt
 
@@ -313,10 +283,49 @@ Sort, remove Rows 2 and 3, and change Column 1 header to enable Join:
 
 
 
+Finally, for each group the SNPs with unknown or multiple positions were split into separate files, and the remaining SNPs were reorganized to match their appropriate final formats before being divided by chromosome number:
 
+    $ (head -n 1 maize_master_snps.txt; tail -n +2 maize_master_snps.txt | awk '$2 ~ /unknown/ {print $0}') > C_unknown_maize.txt
 
+    $ (head -n 1 maize_master_snps.txt; tail -n +2 maize_master_snps.txt | awk '$2 ~ /multiple/ || $3 ~ /multiple/ {print $0}') | sed 's/#//g' > C_multiple_maize.txt
 
+    $ (head -n 1 maize_master_snps.txt; tail -n +2 maize_master_snps.txt | awk '$2 !~ /unknown|multiple/ && $3 !~ /multiple/ {print $0}') > maize_known_snps.txt
 
+    $ wc -l C_unknown_maize.txt C_multiple_maize.txt maize_known_snps.txt
+         28 C_unknown_maize.txt
+         18 C_multiple_maize.txt
+        940 maize_known_snps.txt
+        986 total
 
+    $ sort -k2,2n -k3,3n maize_known_snps.txt > maize_ascending_snps.txt
 
+    $ sort -k2,2n -k3,3nr maize_ascending_snps.txt | sed 's/?/-/g' > maize_descending_snps.txt
 
+    $ awk 'NR==1{h=$0; next};!seen [$2]++{f="C"$2"_maize_ascending.txt"; print h > f};{f="C"$2"_maize_ascending.txt"; print >> f; close (f)}' maize_ascending_snps.txt
+
+    $ awk 'NR==1{h=$0; next};!seen [$2]++{f="C"$2"_maize_descending.txt"; print h > f};{f="C"$2"_maize_descending.txt"; print >> f; close (f)}' maize_descending_snps.txt
+
+---
+
+    $ (head -n 1 teosinte_master_snps.txt; tail -n +2 teosinte_master_snps.txt | awk '$2 ~ /unknown/ {print $0}') > C_unknown_teosinte.txt
+
+    $ (head -n 1 teosinte_master_snps.txt; tail -n +2 teosinte_master_snps.txt | awk '$2 ~ /multiple/ || $3 ~ /multiple/ {print $0}') | sed 's/#//g' > C_multiple_teosinte.txt
+
+    $ (head -n 1 teosinte_master_snps.txt; tail -n +2 teosinte_master_snps.txt | awk '$2 !~ /unknown|multiple/ && $3 !~ /multiple/ {print $0}') > teosinte_known_snps.txt
+
+    $ wc -l C_unknown_teosinte.txt C_multiple_teosinte.txt teosinte_known_snps.txt
+         28 C_unknown_teosinte.txt
+         18 C_multiple_teosinte.txt
+        940 teosinte_known_snps.txt
+        986 total
+
+    $ sort -k2,2n -k3,3n teosinte_known_snps.txt > teosinte_ascending_snps.txt
+
+    $ sort -k2,2n -k3,3nr teosinte_ascending_snps.txt | sed 's/?/-/g' > teosinte_descending_snps.txt
+
+    $ awk 'NR==1{h=$0; next};!seen [$2]++{f="C"$2"_teosinte_ascending.txt"; print h > f};{f="C"$2"_teosinte_ascending.txt"; print >> f; close (f)}' teosinte_ascending_snps.txt
+
+    $ awk 'NR==1{h=$0; next};!seen [$2]++{f="C"$2"_teosinte_descending.txt"; print h > f};{f="C"$2"_teosinte_descending.txt"; print >> f; close (f)}' teosinte_descending_snps.txt
+
+##Afterward:
+Since this exercise only involved two groups (maize and teosinte), the practical approach was simply to run duplicate commands for each group. For a larger number of groups though, the preceding method could be readily streamlined to allow for greater indexing over the range of desired groups.
